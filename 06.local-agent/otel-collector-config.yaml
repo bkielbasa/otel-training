@@ -3,22 +3,32 @@ receivers:
     protocols:
       grpc:
       http:
+  jaeger:
+    protocols:
+      grpc:
+
+processors:
+  batch:
+  memory_limiter:
+    check_interval: 5s
+    limit_percentage: 50
+    spike_limit_percentage: 30
 
 exporters:
-  logging:
-    loglevel: debug
-  prometheus:
-    endpoint: "prometheus:8889" # Default port for Prometheus exporter
-  jaeger:
-    endpoint: "jaeger:14250" # gRPC endpoint for Jaeger
+  otlp:
+    endpoint: jaeger:4317
     tls:
       insecure: true
-
+  otlp/nr:
+    endpoint: https://otlp.eu01.nr-data.net:443
+    headers:
+      api-key: eu01xxb126e8179b3753fafe692f1814FFFFNRAL
+    tls:
+      insecure: true
+      
 service:
   pipelines:
     traces:
-      receivers: [otlp]
-      exporters: [logging, jaeger]
-    metrics:
-      receivers: [otlp]
-      exporters: [logging, prometheus]
+      receivers: [otlp, jaeger]
+      processors: [batch, memory_limiter]
+      exporters: [otlp, otlp/nr]

@@ -4,9 +4,10 @@ services:
     build:
       context: ./api
       dockerfile: Dockerfile
-    depends_on:
-      - otel-collector
+    networks:
+      - your_network
     links:
+      - otel-collector
       - temperature
       - storage
       - db
@@ -25,7 +26,7 @@ services:
       - "8080:8080"
     restart: always
     environment:
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - OTEL_EXPORTER_OTLP_HEADERS=api-key=eu01xxb126e8179b3753fafe692f1814FFFFNRAL
       - OTEL_SERVICE_NAME=temperature
       - DB_HOST=db
@@ -77,8 +78,12 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
+    links:
+      - otel-collector
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - your_network
     ports:
       - "9090:9090"
 
@@ -86,6 +91,7 @@ services:
     image: grafana/grafana:latest
     depends_on:
       - prometheus
+      - jaeger
     volumes:
       - grafana-data:/var/lib/grafana
     environment:
@@ -94,20 +100,28 @@ services:
       - "3030:3000"
 
   jaeger:
-    image: jaegertracing/all-in-one:1.32.0
+    networks:
+      - your_network
+    image: jaegertracing/all-in-one:latest
     ports:
-      - "5775:5775/udp"
-      - "6831:6831/udp"
-      - "6832:6832/udp"
-      - "5778:5778"
       - "16686:16686"
-      - "14268:14268"
-      - "14250:14250"
-      - "9411:9411"
+      - "16687:16687"
+    environment:
+      - METRICS_STORAGE_TYPE=prometheus
+      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+      - PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR=${PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR:-true}
+      - PROMETHEUS_QUERY_NAMESPACE=${PROMETHEUS_QUERY_NAMESPACE:-}
+      - PROMETHEUS_QUERY_DURATION_UNIT=${PROMETHEUS_QUERY_DURATION_UNIT:-}
+      - PROMETHEUS_QUERY_NORMALIZE_CALLS=true
+      - PROMETHEUS_QUERY_NORMALIZE_DURATION=true
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     command: ["--config=/etc/otel-collector-config.yaml"]
+    depends_on:
+      - jaeger
+    networks:
+      - your_network
     volumes:
       - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
@@ -120,3 +134,6 @@ volumes:
   grafana-data:
   minio_data:
 
+
+networks:
+  your_network:
