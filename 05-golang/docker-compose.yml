@@ -1,0 +1,103 @@
+version: '3.8'
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    links:
+      - temperature
+      - storage
+      - db
+    ports:
+      - "3333:3333"
+    environment:
+      - NODE_ENV=production
+      - POSTGRES_HOST=db
+      - TEMPERATURE_HOST=temperature
+      - STORAGE_HOST=storage
+
+  temperature:
+    build: ./temperature
+    ports:
+      - "8080:8080"
+    restart: always
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASSWORD=your_password
+      - DB_NAME=temperature_db
+    depends_on:
+      - db
+    links:
+      - db
+
+  db:
+    image: postgres
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_password
+      POSTGRES_DB: temperature_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  storage:
+    build: ./storage
+    ports:
+      - "5000:5000"
+    restart: always
+    # environment:
+    depends_on:
+      - minio
+    links:
+      - minio
+
+  minio:
+    image: docker.io/bitnami/minio:2022
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - 'minio_data:/data'
+    environment:
+      - MINIO_ROOT_USER=your_username
+      - MINIO_ROOT_PASSWORD=your_pasword
+      - MINIO_DEFAULT_BUCKETS=weather-data
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "secret"
+    ports:
+      - "3030:3000"
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.32.0
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686"
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+
+volumes:
+  postgres_data:
+  grafana-data:
+  minio_data:
+
