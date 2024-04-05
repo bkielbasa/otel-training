@@ -183,6 +183,7 @@ and update `config.yaml` to add our receiver.
 and regenerate it!
 
 ```sh
+./ocb --config builder-config.yaml
 go run ./otelcol-dev --config config.yaml
 ```
 
