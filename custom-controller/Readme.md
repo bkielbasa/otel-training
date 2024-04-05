@@ -121,6 +121,10 @@ import (
 type traceReceiver struct {
 	host   component.Host
 	cancel context.CancelFunc
+
+	logger       *zap.Logger
+	nextConsumer consumer.Traces
+	config       *Config
 }
 
 func (tr *traceReceiver) Start(ctx context.Context, host component.Host) error {
