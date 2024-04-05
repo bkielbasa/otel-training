@@ -28,7 +28,7 @@ func components() (otelcol.Factories, error) {
 
 	factories.Receivers, err = receiver.MakeFactoryMap(
 		otlpreceiver.NewFactory(),
-		  tracescleaner.NewFactory(),
+		//   tracescleaner.NewFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err
@@ -44,6 +44,7 @@ func components() (otelcol.Factories, error) {
 
 	factories.Processors, err = processor.MakeFactoryMap(
 		batchprocessor.NewFactory(),
+		tracescleaner.NewProcessorFactory(),
 	)
 	if err != nil {
 		return otelcol.Factories{}, err

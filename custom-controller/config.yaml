@@ -1,14 +1,21 @@
 receivers:
-  tracescleaner:
-    otel:
-      protocols:
-        http:
-          endpoint: 0.0.0.0:14318
-    exclude:
-      - lets
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+  # tracescleaner:
+  #   otel:
+  #     protocols:
+  #       http:
+  #         endpoint: 0.0.0.0:14318
+  #   exclude:
+  #     - lets
 
 processors:
   batch:
+  tracescleaner:
+    exclude:
+      - lets
 
 exporters:
   # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
@@ -22,8 +29,8 @@ exporters:
 service:
   pipelines:
     traces:
-      receivers: [tracescleaner]
-      processors: [batch]
+      receivers: [otlp]
+      processors: [tracescleaner, batch]
       exporters: [otlp/jaeger, debug]
   telemetry:
     logs:
