@@ -1,12 +1,11 @@
 receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:14317
-
   tracescleaner:
+    otel:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:14318
     exclude:
-      - lala
+      - lets
 
 processors:
   batch:
@@ -23,7 +22,7 @@ exporters:
 service:
   pipelines:
     traces:
-      receivers: [otlp,tracescleaner]
+      receivers: [tracescleaner]
       processors: [batch]
       exporters: [otlp/jaeger, debug]
   telemetry:
