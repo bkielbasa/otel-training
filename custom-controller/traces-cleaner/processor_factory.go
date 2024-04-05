@@ -13,7 +13,25 @@ import (
 )
 
 type ProcessorConfig struct {
-	Exclude []string `mapstructure:"exclude"`
+	Exclude         []string `mapstructure:"exclude"`
+	ExcludeCompiled []*regexp.Regexp
+}
+
+func (cfg *ProcessorConfig) Validate() error {
+	if len(cfg.Exclude) == 0 {
+		return nil
+	}
+
+	for _, e := range cfg.Exclude {
+		r, err := regexp.Compile(e)
+		if err != nil {
+			return err
+		}
+		cfg.ExcludeCompiled = append(cfg.ExcludeCompiled, r)
+	}
+
+	return nil
+
 }
 
 type tracesProcessor struct {
@@ -33,7 +51,36 @@ func (tp *tracesProcessor) Shutdown(ctx context.Context) error {
 
 func (tp *tracesProcessor) ConsumeTraces(ctx context.Context, td ptrace.Traces) error {
 	es := td.ResourceSpans()
+	tp.filterSpans(es)
+	tp.filterTraces(td)
 
+	tp.logger.Info("ConsumeTraces", zap.Any("traces", td.SpanCount()))
+	tp.nextConsumer.ConsumeTraces(ctx, td)
+	return nil
+}
+func (tp *tracesProcessor) filterTraces(td ptrace.Traces) {
+	es := td.ResourceSpans()
+	for i := 0; i < es.Len(); i++ {
+		e := es.At(i)
+
+		traceName, _ := e.Resource().Attributes().Get("service.name")
+		for _, r := range tp.config.ExcludeCompiled {
+
+			if r.MatchString(traceName.AsString()) {
+				es.RemoveIf(func(ptrace.ResourceSpans) bool {
+					return true
+				})
+
+				tp.logger.Info("Exclude trace", zap.Any("trace", traceName))
+				continue
+			}
+		}
+
+		tp.logger.Info("filterTraces", zap.Any("attributes", e.Resource().Attributes().AsRaw()))
+	}
+}
+
+func (tp *tracesProcessor) filterSpans(es ptrace.ResourceSpansSlice) {
 	for i := 0; i < es.Len(); i++ {
 		e := es.At(i)
 		tp.logger.Info("ResourceSpans", zap.Any("attributes", e.Resource().Attributes().AsRaw()))
@@ -47,11 +94,9 @@ func (tp *tracesProcessor) ConsumeTraces(ctx context.Context, td ptrace.Traces) 
 			for k := 0; k < ss.Spans().Len(); k++ {
 				s := ss.Spans().At(k)
 
-				tp.logger.Info("Span", zap.Any("attributes", s.Attributes().AsRaw()))
 				tp.logger.Info("Span name", zap.Any("attributes", s.Name()))
 
-				for _, ex := range tp.config.Exclude {
-					r, _ := regexp.Compile(ex)
+				for _, r := range tp.config.ExcludeCompiled {
 					if r.MatchString(s.Name()) {
 						spanIDsToRemove = append(spanIDsToRemove, s.SpanID())
 						tp.logger.Info("Exclude span", zap.Any("span", s.Name()))
@@ -70,10 +115,6 @@ func (tp *tracesProcessor) ConsumeTraces(ctx context.Context, td ptrace.Traces) 
 			})
 		}
 	}
-
-	tp.logger.Info("ConsumeTraces", zap.Any("traces", td.SpanCount()))
-	tp.nextConsumer.ConsumeTraces(ctx, td)
-	return nil
 }
 
 func (tp *tracesProcessor) Capabilities() consumer.Capabilities {
