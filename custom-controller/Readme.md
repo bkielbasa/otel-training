@@ -54,7 +54,18 @@ We can write a validation function just to make sure that all patterns are valid
 package tracescleaner
 
 func (cfg *Config) Validate() error {
-    // validation goes here
+	if len(cfg.Exclude) == 0 {
+		return errors.New("exclude list is empty")
+	}
+
+	for _, e := range cfg.Exclude {
+		_, err := regexp.Compile(e)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 ```
 
@@ -147,7 +158,7 @@ func createTracesReceiver(_ context.Context, params receiver.CreateSettings, bas
 }
 ```
 
-Update `componeents.go` file to add our receiver
+Update `components.go` file to add our receiver
 
 ```go
 	factories.Receivers, err = receiver.MakeFactoryMap(
